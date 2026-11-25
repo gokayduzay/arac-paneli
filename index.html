@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Araç Paneli">
+<meta name="theme-color" content="#05070a">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Araç Paneli</title>
+<style>
+  :root{
+    --bg:#05070a; --text:#eef3f7; --muted:#7d8996; --line:rgba(255,255,255,.07);
+    --accent:#2ee6c5; --accent-rgb:46,230,197; --warn:#ff3b4f; --amber:#ffb020;
+    --zone:rgb(46,230,197); --zoneA:rgba(46,230,197,.22);
+    --tick:#3a4653; --tick-major:#d5dee6; --face1:#1a222b; --face2:#06080b;
+    --card-hi:rgba(255,255,255,.055); --card-lo:rgba(255,255,255,.012);
+    --dial:500px;
+  }
+  body.night{
+    --text:#a9b4bd; --muted:#55606a; --line:rgba(255,255,255,.04);
+    --tick:#232b33; --tick-major:#7f8992; --face1:#0c1015; --face2:#000;
+    --card-hi:rgba(255,255,255,.03); --card-lo:rgba(255,255,255,.005);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;color:var(--text);overflow:hidden;background:var(--bg)}
+  body{
+    position:fixed;inset:0;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation;
+    background:
+      radial-gradient(ellipse 70% 80% at 28% 45%, rgba(var(--accent-rgb),.07) 0%, rgba(0,0,0,0) 60%),
+      radial-gradient(ellipse at 50% 50%, #0d131a 0%, #05070a 75%);
+  }
+  body.night{background:#000}
+  body::before{ /* karbon fiber dokusu */
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background:
+      repeating-linear-gradient(45deg, rgba(255,255,255,.018) 0 2px, rgba(0,0,0,0) 2px 4px),
+      repeating-linear-gradient(-45deg, rgba(0,0,0,.25) 0 2px, rgba(0,0,0,0) 2px 4px);
+  }
+  body.night::before{opacity:.25}
+  #app{
+    position:absolute;inset:0;
+    padding:calc(env(safe-area-inset-top) + 14px) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 10px) calc(env(safe-area-inset-left) + 16px);
+    display:grid;grid-template-columns:1.32fr 1fr;grid-template-rows:minmax(0,1fr) auto;gap:14px;
+  }
+  /* ---------- Kadran ---------- */
+  .gauge-wrap{position:relative;display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden;
+    border-radius:28px;border:1px solid var(--line);
+    background:linear-gradient(160deg,var(--card-hi),var(--card-lo));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 14px 40px rgba(0,0,0,.55)}
+  .gauge-wrap.over{border-color:var(--warn);animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:inset 0 0 0 0 rgba(255,59,79,0),0 14px 40px rgba(0,0,0,.55)}50%{box-shadow:inset 0 0 40px 0 rgba(255,59,79,.28),0 14px 40px rgba(0,0,0,.55)}}
+  .dial{position:relative;width:var(--dial);height:var(--dial);margin-top:-18px}
+  .glow{position:absolute;inset:-12%;border-radius:50%;pointer-events:none;
+    background:radial-gradient(circle at 50% 50%, var(--zoneA) 0%, rgba(0,0,0,0) 58%);transition:background .4s}
+  #gauge{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .digits{position:absolute;left:0;right:0;top:63%;text-align:center;pointer-events:none}
+  #speedNum{font-size:calc(var(--dial) * .2);font-weight:200;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums;
+    color:#fff;text-shadow:0 0 calc(var(--dial) * .05) var(--zone), 0 0 2px rgba(255,255,255,.4)}
+  body.night #speedNum{color:var(--text)}
+  .unit{font-size:calc(var(--dial) * .036);letter-spacing:.35em;color:var(--muted);margin-top:calc(var(--dial) * .012);padding-left:.35em}
+  .gauge-chips{position:absolute;left:0;right:0;bottom:14px;display:flex;justify-content:center;gap:10px}
+  .chip{background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:999px;padding:7px 15px;font-size:14px;color:var(--muted);white-space:nowrap}
+  .chip b{color:var(--text);font-weight:600;margin-left:5px}
+  .chip.warn{border-color:rgba(255,59,79,.5)} .chip.warn b{color:var(--warn)}
+  /* ---------- Sağ sütun ---------- */
+  .side{display:flex;flex-direction:column;gap:12px;min-height:0}
+  .card{position:relative;border-radius:24px;padding:15px 19px;border:1px solid var(--line);
+    background:linear-gradient(160deg,var(--card-hi),var(--card-lo));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 10px 30px rgba(0,0,0,.45)}
+  .clock{display:flex;align-items:center;justify-content:space-between;gap:10px;overflow:hidden}
+  .clock::after{content:"";position:absolute;left:20px;right:20px;top:0;height:2px;border-radius:2px;
+    background:linear-gradient(90deg,rgba(0,0,0,0),var(--accent),rgba(0,0,0,0));opacity:.8}
+  .time-row{display:flex;align-items:baseline;gap:6px}
+  #time{font-size:60px;font-weight:200;letter-spacing:-1px;line-height:1;font-variant-numeric:tabular-nums}
+  #sec{font-size:22px;font-weight:300;color:var(--accent);font-variant-numeric:tabular-nums}
+  #date{font-size:15px;color:var(--muted);margin-top:7px}
+  .weather{text-align:right}
+  #wIcon{font-size:36px;line-height:1}
+  #wTemp{font-size:28px;font-weight:300;margin-top:2px}
+  #wDesc{font-size:13px;color:var(--muted)}
+  .trip{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+  .stat{position:relative;padding-left:12px}
+  .stat::before{content:"";position:absolute;left:0;top:3px;bottom:3px;width:3px;border-radius:3px;background:var(--accent);opacity:.75}
+  .stat:nth-child(2)::before{background:#3d8bff} .stat:nth-child(3)::before{background:var(--amber)} .stat:nth-child(4)::before{background:var(--warn)}
+  .stat .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.9px}
+  .stat .v{font-size:27px;font-weight:300;font-variant-numeric:tabular-nums;margin-top:2px}
+  .stat .v small{font-size:13px;color:var(--muted);font-weight:400;margin-left:3px}
+  .trip-foot{grid-column:1 / -1;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:9px;font-size:13px;color:var(--muted)}
+  .btn-small{background:rgba(0,0,0,.3);border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:7px 12px;font-size:13px;font-family:inherit}
+  .btn-small:active{background:rgba(255,255,255,.08)}
+  .launcher{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:12px;min-height:0}
+  .app-btn{position:relative;overflow:hidden;border:none;border-radius:24px;font-family:inherit;color:#fff;font-size:18px;font-weight:600;letter-spacing:.2px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;min-height:84px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.35), inset 0 -2px 0 rgba(0,0,0,.2), 0 10px 26px var(--sh);
+    transition:transform .12s, filter .12s}
+  .app-btn::before{content:"";position:absolute;left:0;right:0;top:0;height:50%;
+    background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,0));pointer-events:none}
+  .app-btn:active{transform:scale(.95);filter:brightness(1.15)}
+  .app-btn svg{width:40px;height:40px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+  /* Tek renk, mat altın butonlar */
+  .app-btn{color:#d8bd85;--sh:rgba(0,0,0,.45);
+    background:linear-gradient(150deg,#2b251a 0%,#1a1610 55%,#120f0a 100%);
+    border:1px solid rgba(201,166,98,.28);
+    box-shadow:inset 0 1px 0 rgba(232,203,140,.14), inset 0 -1px 0 rgba(0,0,0,.4), 0 10px 26px rgba(0,0,0,.45)}
+  .app-btn::before{background:linear-gradient(180deg,rgba(232,203,140,.07),rgba(232,203,140,0))}
+  .app-btn svg{fill:#c9a662;filter:none}
+  .app-btn:active{filter:none;background:linear-gradient(150deg,#3a3122,#211b12);border-color:rgba(201,166,98,.55)}
+  body.night .app-btn{filter:brightness(.6);box-shadow:inset 0 1px 0 rgba(232,203,140,.06)}
+  body.night .app-btn:active{filter:brightness(.8)}
+  /* ---------- Durum çubuğu ---------- */
+  .status{grid-column:1 / -1;display:flex;align-items:center;gap:16px;font-size:14px;color:var(--muted);padding:0 4px}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);display:inline-block;margin-right:7px;vertical-align:middle}
+  .dot.ok{background:var(--accent);box-shadow:0 0 8px var(--accent)} .dot.weak{background:var(--amber);box-shadow:0 0 8px var(--amber)} .dot.bad{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+  .status .grow{flex:1}
+  #gpsHint{color:var(--amber)}
+  .icon-btn{background:linear-gradient(160deg,var(--card-hi),var(--card-lo));border:1px solid var(--line);color:var(--text);border-radius:12px;height:38px;padding:0 14px;font-size:14px;font-family:inherit}
+  .icon-btn:active{background:rgba(255,255,255,.08)}
+  /* ---------- Katmanlar ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.86);display:flex;align-items:center;justify-content:center;z-index:20}
+  .overlay.hidden{display:none}
+  .start-box{text-align:center;max-width:540px;padding:20px}
+  .start-box h1{font-weight:200;font-size:46px;margin:0 0 10px;letter-spacing:.5px}
+  .start-box p{color:var(--muted);font-size:16px;line-height:1.55;margin:0 0 30px}
+  .btn-primary{position:relative;background:var(--accent);color:#04120f;border:none;border-radius:999px;font-size:21px;font-weight:700;padding:20px 54px;font-family:inherit;
+    box-shadow:0 0 0 6px rgba(var(--accent-rgb),.15), 0 0 40px rgba(var(--accent-rgb),.45);animation:breathe 2.4s ease-in-out infinite}
+  @keyframes breathe{0%,100%{box-shadow:0 0 0 6px rgba(var(--accent-rgb),.12),0 0 30px rgba(var(--accent-rgb),.35)}50%{box-shadow:0 0 0 12px rgba(var(--accent-rgb),.08),0 0 55px rgba(var(--accent-rgb),.55)}}
+  .modal{background:#0d1217;border:1px solid var(--line);border-radius:24px;width:min(660px,92vw);max-height:88vh;overflow:auto;-webkit-overflow-scrolling:touch;padding:22px 24px;box-shadow:0 30px 80px rgba(0,0,0,.7)}
+  .modal h2{margin:0 0 12px;font-weight:300;font-size:26px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);font-size:16px}
+  .row .lbl small{display:block;color:var(--muted);font-size:13px;margin-top:3px}
+  .row select,.row input[type=number]{background:#05070a;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 10px;font-size:16px;font-family:inherit;min-width:120px;text-align:right}
+  .seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg button{background:transparent;color:var(--muted);border:none;padding:9px 14px;font-size:15px;font-family:inherit}
+  .seg button.on{background:rgba(var(--accent-rgb),.16);color:var(--accent)}
+  .swatches{display:flex;gap:10px}
+  .swatches button{width:34px;height:34px;border-radius:50%;border:2px solid transparent;padding:0}
+  .swatches button.on{border-color:#fff;box-shadow:0 0 12px rgba(255,255,255,.4)}
+  .modal-foot{display:flex;justify-content:space-between;gap:10px;margin-top:18px}
+  .btn-danger{background:transparent;border:1px solid var(--warn);color:var(--warn);border-radius:12px;padding:11px 16px;font-size:15px;font-family:inherit}
+  .btn-ok{background:var(--accent);border:none;color:#04120f;border-radius:12px;padding:11px 28px;font-size:16px;font-weight:700;font-family:inherit}
+  /* ---------- Dikey yön ---------- */
+  @media (orientation:portrait){
+    #app{grid-template-columns:1fr;grid-template-rows:44vh auto auto minmax(0,1fr) auto;gap:10px}
+    .side{display:contents}
+    .app-btn{min-height:0;font-size:17px}
+    .app-btn svg{width:30px;height:30px}
+    #time{font-size:50px}
+    .stat .v{font-size:23px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <section class="gauge-wrap" id="gaugeWrap">
+    <div class="dial" id="dial">
+      <div class="glow"></div>
+      <svg id="gauge" viewBox="0 0 400 400">
+        <defs>
+          <radialGradient id="faceGrad" cx="50%" cy="45%" r="55%">
+            <stop offset="0%" id="face1" stop-color="#1a222b"/>
+            <stop offset="100%" id="face2" stop-color="#06080b"/>
+          </radialGradient>
+          <linearGradient id="bezel" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#9aa6b2"/>
+            <stop offset="35%" stop-color="#2a3139"/>
+            <stop offset="65%" stop-color="#12161b"/>
+            <stop offset="100%" stop-color="#6c7884"/>
+          </linearGradient>
+          <linearGradient id="needleGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="35%" stop-color="#ff5a6b"/>
+            <stop offset="100%" stop-color="#b3001b"/>
+          </linearGradient>
+          <radialGradient id="hubGrad" cx="40%" cy="35%" r="70%">
+            <stop offset="0%" stop-color="#5a6570"/>
+            <stop offset="60%" stop-color="#1a2027"/>
+            <stop offset="100%" stop-color="#0a0d10"/>
+          </radialGradient>
+          <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity=".07"/>
+            <stop offset="50%" stop-color="#ffffff" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <circle cx="200" cy="200" r="197" fill="none" stroke="url(#bezel)" stroke-width="4"/>
+        <circle cx="200" cy="200" r="193" fill="url(#faceGrad)"/>
+        <g id="segs"></g>
+        <circle cx="200" cy="200" r="168" fill="none" style="stroke:var(--line)" stroke-width="1"/>
+        <g id="ticks"></g>
+        <line id="limitMark" stroke-width="5" stroke-linecap="round" opacity="0" style="stroke:var(--warn)"/>
+        <circle cx="200" cy="200" r="104" fill="none" style="stroke:var(--line)" stroke-width="1" stroke-dasharray="2 5"/>
+        <g id="needle">
+          <polygon points="191,216 209,216 202.5,44 197.5,44" style="fill:var(--zone)" opacity=".28"/>
+          <polygon points="196,216 204,216 201,50 199,50" fill="url(#needleGrad)"/>
+          <polygon points="197,216 203,216 202,234 198,234" fill="#2a3139"/>
+        </g>
+        <circle cx="200" cy="200" r="18" fill="url(#hubGrad)" stroke="#5a6570" stroke-width="1.5"/>
+        <circle cx="200" cy="200" r="6" style="fill:var(--zone)"/>
+        <path d="M 30 200 A 170 170 0 0 1 370 200 L 330 200 A 130 130 0 0 0 70 200 Z" fill="url(#gloss)" pointer-events="none"/>
+      </svg>
+      <div class="digits">
+        <div id="speedNum">0</div>
+        <div class="unit">KM/H</div>
+      </div>
+    </div>
+    <div class="gauge-chips">
+      <div class="chip">Maks<b id="chipMax">0</b></div>
+      <div class="chip" id="chipLimitWrap">Limit<b id="chipLimit">—</b></div>
+      <div class="chip">Yön<b id="chipHeading">—</b></div>
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="card clock">
+      <div>
+        <div class="time-row"><div id="time">--:--</div><div id="sec">00</div></div>
+        <div id="date"></div>
+      </div>
+      <div class="weather">
+        <div id="wIcon">·</div>
+        <div id="wTemp">--°</div>
+        <div id="wDesc">Hava durumu</div>
+      </div>
+    </div>
+
+    <div class="card trip">
+      <div class="stat"><div class="k">Mesafe</div><div class="v"><span id="tDist">0,0</span><small>km</small></div></div>
+      <div class="stat"><div class="k">Sürüş süresi</div><div class="v" id="tTime">0:00</div></div>
+      <div class="stat"><div class="k">Ortalama</div><div class="v"><span id="tAvg">0</span><small>km/h</small></div></div>
+      <div class="stat"><div class="k">Maks</div><div class="v"><span id="tMax">0</span><small>km/h</small></div></div>
+      <div class="trip-foot">
+        <span>Toplam: <b id="tOdo" style="color:var(--text);font-weight:500">0</b> km</span>
+        <button class="btn-small" id="btnResetTrip">Yolculuğu sıfırla</button>
+      </div>
+    </div>
+
+    <div class="launcher">
+      <button class="app-btn b-spotify" data-app="spotify">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 1.5a10.5 10.5 0 1 0 0 21 10.5 10.5 0 0 0 0-21zm4.8 15.150a.66.66 0 0 1-.9.22c-2.480-1.520-5.600-1.860-9.280-1.020a.65.65 0 1 1-.29-1.27c4.020-.92 7.470-.53 10.250 1.170.31.19.41.6.22.9zm1.29-2.86a.82.82 0 0 1-1.13.27c-2.84-1.75-7.170-2.250-10.530-1.230a.82.82 0 1 1-.48-1.57c3.840-1.160 8.600-.6 11.870 1.400.38.24.5.75.27 1.130zm.11-2.98C14.8 8.8 9.18 8.6 5.93 9.6a.98.98 0 1 1-.57-1.88c3.73-1.13 9.94-.91 13.86 1.42a.98.98 0 0 1-1.02 1.67z"/></svg>
+        Spotify
+      </button>
+      <button class="app-btn b-youtube" data-app="youtube">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M23 7.2a3 3 0 0 0-2.1-2.1C19 4.6 12 4.6 12 4.6s-7 0-8.9.5A3 3 0 0 0 1 7.2 31 31 0 0 0 .5 12a31 31 0 0 0 .5 4.8 3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.8 31 31 0 0 0-.5-4.8zM9.75 15.02V8.98L15.5 12l-5.75 3.02z"/></svg>
+        YouTube
+      </button>
+      <button class="app-btn b-navi" data-app="navi">
+        <svg viewBox="0 0 24 24" fill="#1a1300"><path d="M12 2 4 21l8-4 8 4z"/></svg>
+        Yandex Navi
+      </button>
+      <button class="app-btn b-maps" data-app="maps">
+        <svg viewBox="0 0 24 24" fill="#ff3b30"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>
+        Yandex Haritalar
+      </button>
+    </div>
+  </aside>
+
+  <footer class="status">
+    <span><span class="dot" id="gpsDot"></span><span id="gpsText">Konum kapalı</span></span>
+    <span id="gpsAcc"></span>
+    <span id="gpsHint"></span>
+    <span class="grow"></span>
+    <span id="srcLabel"></span>
+    <button class="icon-btn" id="btnNight">Gece</button>
+    <button class="icon-btn" id="btnSettings">⚙︎ Ayarlar</button>
+  </footer>
+</div>
+
+<!-- Başlangıç ekranı -->
+<div class="overlay" id="startOverlay">
+  <div class="start-box">
+    <h1>Araç Paneli</h1>
+    <p>Hız göstergesi için konum izni gerekiyor. Wi-Fi modeli iPad'lerde gerçek hız için Bluetooth GPS alıcısı bağlı olmalı; yoksa Ayarlar'dan demo modunu açabilirsin.</p>
+    <button class="btn-primary" id="btnStart">Sürüşe başla</button>
+  </div>
+</div>
+
+<!-- Ayarlar -->
+<div class="overlay hidden" id="settingsOverlay">
+  <div class="modal">
+    <h2>Ayarlar</h2>
+    <div class="row"><div class="lbl">Renk teması<small>Kadran, vurgu ve ışıltı rengi</small></div>
+      <div class="swatches" id="swatches"></div></div>
+    <div class="row"><div class="lbl">Kadran üst sınırı<small>Gösterge skalası</small></div>
+      <select id="sMax"><option>160</option><option>200</option><option>240</option><option>260</option></select></div>
+    <div class="row"><div class="lbl">Hız uyarı limiti (km/h)<small>0 = kapalı. Aşılınca kadran kırmızıya döner.</small></div>
+      <input type="number" id="sLimit" min="0" max="300" step="5" inputmode="numeric"></div>
+    <div class="row"><div class="lbl">Sesli uyarı<small>Limit aşıldığında kısa bip (10 sn'de bir)</small></div>
+      <div class="seg" data-key="beep"><button data-v="1">Açık</button><button data-v="0">Kapalı</button></div></div>
+    <div class="row"><div class="lbl">Açılış animasyonu<small>Başlangıçta ibre skalayı süpürür</small></div>
+      <div class="seg" data-key="sweep"><button data-v="1">Açık</button><button data-v="0">Kapalı</button></div></div>
+    <div class="row"><div class="lbl">Hız kalibrasyonu (%)<small>GPS gerçek hızı verir. Araç göstergesiyle eşlemek için örn. 104 gir.</small></div>
+      <input type="number" id="sCalib" min="80" max="120" step="1" inputmode="numeric"></div>
+    <div class="row"><div class="lbl">Gece modu<small>Otomatik: 19:00–07:00 arası kısık tema</small></div>
+      <div class="seg" data-key="night"><button data-v="auto">Otomatik</button><button data-v="on">Açık</button><button data-v="off">Kapalı</button></div></div>
+    <div class="row"><div class="lbl">Hız kaynağı<small>Demo, park halindeyken arayüzü test etmek içindir</small></div>
+      <div class="seg" data-key="source"><button data-v="gps">GPS</button><button data-v="demo">Demo</button></div></div>
+    <div class="row"><div class="lbl">Uygulama açılmazsa web sürümüne geç<small>Eski sürüm silinirse YouTube/Spotify web'de açılır</small></div>
+      <div class="seg" data-key="webFallback"><button data-v="1">Evet</button><button data-v="0">Hayır</button></div></div>
+    <div class="row"><div class="lbl">Hava durumu konumu<small>Konum alınamazsa kullanılacak şehir</small></div>
+      <select id="sCity">
+        <option value="41.0082,28.9784">İstanbul</option>
+        <option value="39.9334,32.8597">Ankara</option>
+        <option value="38.4237,27.1428">İzmir</option>
+        <option value="40.1885,29.0610">Bursa</option>
+        <option value="36.8969,30.7133">Antalya</option>
+        <option value="37.0344,27.4305">Bodrum</option>
+      </select></div>
+    <div class="modal-foot">
+      <button class="btn-danger" id="btnResetOdo">Toplam km'yi sıfırla</button>
+      <button class="btn-ok" id="btnCloseSettings">Tamam</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  /* ================= Temalar ================= */
+  var THEMES = {
+    turkuaz:{name:'Turkuaz', c:[46,230,197]},
+    mavi:{name:'Elektrik mavisi', c:[61,139,255]},
+    sport:{name:'Sport kırmızı', c:[255,70,85]},
+    amber:{name:'Amber', c:[255,176,32]},
+    mor:{name:'Mor', c:[164,107,255]},
+    beyaz:{name:'Buz beyazı', c:[220,232,242]}
+  };
+  var AMBER = [255,176,32], RED = [255,59,79];
+
+  /* ================= Ayarlar & kalıcılık ================= */
+  var DEF = {max:240, limit:0, beep:'0', sweep:'1', calib:100, night:'auto', source:'gps', webFallback:'1', city:'41.0082,28.9784', theme:'turkuaz'};
+  function load(k, d){ try{ var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
+  function save(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  var S = Object.assign({}, DEF, load('ap_settings', {}));
+  if (!THEMES[S.theme]) S.theme = 'turkuaz';
+  var T = Object.assign({dist:0, moving:0, max:0, odo:0}, load('ap_trip', {}));
+  var $ = function(id){ return document.getElementById(id); };
+  var root = document.documentElement;
+
+  function rgb(c){ return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')'; }
+  function rgba(c, a){ return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
+  function lerp(a, b, t){ return [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)]; }
+  function accentC(){ return THEMES[S.theme].c; }
+  function zoneColor(f){ // hız oranına göre renk: tema → amber → kırmızı
+    var A = accentC();
+    if (S.theme === 'amber') return f < 0.7 ? lerp(A, [255,120,40], f / 0.7) : lerp([255,120,40], RED, (f - 0.7) / 0.3);
+    if (S.theme === 'sport') return f < 0.75 ? lerp([255,255,255], A, f / 0.75) : lerp(A, RED, (f - 0.75) / 0.25);
+    if (f < 0.55) return A;
+    if (f < 0.8) return lerp(A, AMBER, (f - 0.55) / 0.25);
+    return lerp(AMBER, RED, (f - 0.8) / 0.2);
+  }
+  function applyTheme(){
+    var c = accentC();
+    root.style.setProperty('--accent', rgb(c));
+    root.style.setProperty('--accent-rgb', c.join(','));
+  }
+
+  /* ================= Kadran boyutu ================= */
+  function sizeDial(){
+    var w = $('gaugeWrap'), s = Math.min(w.clientWidth - 24, w.clientHeight - 70);
+    s = Math.max(200, s);
+    root.style.setProperty('--dial', s + 'px');
+  }
+  window.addEventListener('resize', function(){ setTimeout(sizeDial, 50); });
+  window.addEventListener('orientationchange', function(){ setTimeout(sizeDial, 300); });
+
+  /* ================= Kadran çizimi ================= */
+  var CX = 200, CY = 200, A0 = -120, A1 = 120, NSEG = 60;
+  var segEls = [], segCols = [];
+  function pt(a, r){ var rad = a * Math.PI / 180; return [CX + r * Math.sin(rad), CY - r * Math.cos(rad)]; }
+  function f2(p){ return p[0].toFixed(2) + ' ' + p[1].toFixed(2); }
+  function spdToAng(v){ return A0 + (A1 - A0) * Math.max(0, Math.min(v, S.max)) / S.max; }
+
+  function buildGauge(){
+    // LED segment halkası
+    var step = (A1 - A0) / NSEG, html = '';
+    segCols = [];
+    for (var i = 0; i < NSEG; i++){
+      var as = A0 + i * step + 0.55, ae = as + step - 1.1, r1 = 188, r2 = 174;
+      html += '<path d="M' + f2(pt(as, r1)) + ' A' + r1 + ' ' + r1 + ' 0 0 1 ' + f2(pt(ae, r1)) + ' L' + f2(pt(ae, r2)) +
+              ' A' + r2 + ' ' + r2 + ' 0 0 0 ' + f2(pt(as, r2)) + ' Z" fill="rgba(255,255,255,0.06)"/>';
+      segCols.push(rgb(zoneColor(i / (NSEG - 1))));
+    }
+    $('segs').innerHTML = html;
+    segEls = $('segs').children;
+    litCount = -1;
+    // Çentikler ve rakamlar
+    html = '';
+    for (var v = 0; v <= S.max; v += 5){
+      var a = spdToAng(v), major = v % 20 === 0, mid = v % 10 === 0;
+      var p1 = pt(a, 165), p2 = pt(a, major ? 145 : (mid ? 154 : 159));
+      html += '<line x1="' + p1[0].toFixed(1) + '" y1="' + p1[1].toFixed(1) + '" x2="' + p2[0].toFixed(1) + '" y2="' + p2[1].toFixed(1) +
+              '" style="stroke:' + (major ? 'var(--tick-major)' : 'var(--tick)') + '" stroke-width="' + (major ? 3 : (mid ? 2 : 1.2)) + '" stroke-linecap="round"/>';
+      if (major){
+        var pl = pt(a, 125);
+        html += '<text x="' + pl[0].toFixed(1) + '" y="' + (pl[1] + 6).toFixed(1) + '" text-anchor="middle" style="fill:var(--muted)" font-size="' + (S.max > 200 ? 16 : 18) + '" font-weight="500">' + v + '</text>';
+      }
+    }
+    $('ticks').innerHTML = html;
+    updateLimitMark();
+  }
+  function updateLimitMark(){
+    var m = $('limitMark');
+    if (S.limit > 0 && S.limit <= S.max){
+      var a = spdToAng(S.limit), p1 = pt(a, 166), p2 = pt(a, 192);
+      m.setAttribute('x1', p1[0]); m.setAttribute('y1', p1[1]); m.setAttribute('x2', p2[0]); m.setAttribute('y2', p2[1]);
+      m.setAttribute('opacity', '1');
+      $('chipLimit').textContent = S.limit;
+    } else { m.setAttribute('opacity', '0'); $('chipLimit').textContent = '—'; }
+  }
+
+  /* ================= Çizim döngüsü ================= */
+  var target = 0, shown = 0, lastFix = null, lastFixTs = 0, heading = null, lastLatLon = null, overLimit = false;
+  var litCount = -1, litOver = null, sweepStart = 0;
+
+  function frame(now){
+    var disp;
+    if (sweepStart){
+      var t = (now - sweepStart) / 1000;
+      if (t < 0.9){ var e = t / 0.9; disp = S.max * (1 - Math.pow(1 - e, 3)); }
+      else if (t < 1.25){ disp = S.max; }
+      else if (t < 2.2){ var e2 = (t - 1.25) / 0.95; disp = S.max * (1 - e2 * e2 * (3 - 2 * e2)); }
+      else { sweepStart = 0; disp = 0; shown = 0; }
+      if (sweepStart) shown = disp;
+    }
+    if (!sweepStart){
+      shown += (target - shown) * 0.14;
+      if (Math.abs(target - shown) < 0.05) shown = target;
+      disp = shown;
+    }
+    $('needle').setAttribute('transform', 'rotate(' + spdToAng(disp).toFixed(2) + ' ' + CX + ' ' + CY + ')');
+    var num = Math.round(disp), el = $('speedNum');
+    if (el.textContent != num) el.textContent = num;
+
+    var over = !sweepStart && S.limit > 0 && target > S.limit;
+    var frac = Math.min(disp, S.max) / S.max;
+    var n = Math.round(frac * NSEG);
+    if (n !== litCount || over !== litOver){
+      for (var i = 0; i < NSEG; i++){
+        segEls[i].setAttribute('fill', i < n ? (over ? 'rgb(255,59,79)' : segCols[i]) : 'rgba(255,255,255,0.06)');
+      }
+      var zc = over ? RED : zoneColor(Math.max(0, n - 1) / (NSEG - 1));
+      root.style.setProperty('--zone', rgb(zc));
+      root.style.setProperty('--zoneA', rgba(zc, n === 0 ? 0.10 : 0.16 + 0.14 * frac));
+      litCount = n; litOver = over;
+    }
+    if (over !== overLimit){
+      overLimit = over;
+      $('gaugeWrap').classList.toggle('over', over);
+      $('chipLimitWrap').classList.toggle('warn', over);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ================= GPS ================= */
+  var watchId = null;
+  function haversine(a, b){
+    var R = 6371000, toR = Math.PI / 180;
+    var dLat = (b.lat - a.lat) * toR, dLon = (b.lon - a.lon) * toR;
+    var x = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * toR) * Math.cos(b.lat * toR) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+  }
+  function setGpsStatus(cls, text, acc, hint){
+    $('gpsDot').className = 'dot ' + (cls || '');
+    $('gpsText').textContent = text;
+    $('gpsAcc').textContent = acc || '';
+    $('gpsHint').textContent = hint || '';
+  }
+  function startGps(){
+    if (!('geolocation' in navigator)){ setGpsStatus('bad', 'Konum desteklenmiyor'); return; }
+    if (watchId !== null) return;
+    setGpsStatus('weak', 'Konum bekleniyor…');
+    watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {enableHighAccuracy:true, maximumAge:0, timeout:15000});
+  }
+  function stopGps(){ if (watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; } }
+
+  function onPos(p){
+    var c = p.coords, now = p.timestamp || Date.now();
+    var fix = {lat:c.latitude, lon:c.longitude, t:now, acc:c.accuracy};
+    lastLatLon = fix; lastFixTs = Date.now();
+    if (!weatherFetchedWithGps){ weatherFetchedWithGps = true; fetchWeather(); }
+    if (S.source !== 'gps') return;
+
+    var kmh = null, d = 0, dt = 0;
+    if (lastFix){ d = haversine(lastFix, fix); dt = (now - lastFix.t) / 1000; }
+    if (c.speed !== null && c.speed >= 0) kmh = c.speed * 3.6;
+    else if (lastFix && dt > 0.5 && c.accuracy <= 40) kmh = (d / dt) * 3.6;
+    if (kmh === null) kmh = 0;
+    kmh *= (S.calib / 100);
+    if (kmh < 3) kmh = 0;
+    if (kmh > 320) kmh = target;
+    target = kmh;
+
+    if (lastFix && dt > 0 && dt < 30 && c.accuracy <= 40 && kmh > 3){
+      T.dist += d; T.odo += d; T.moving += dt;
+      if (kmh > T.max) T.max = kmh;
+    }
+    if (c.heading !== null && c.heading >= 0 && kmh > 5) heading = c.heading;
+    lastFix = fix;
+
+    if (c.accuracy <= 20) setGpsStatus('ok', 'GPS aktif', '±' + Math.round(c.accuracy) + ' m');
+    else if (c.accuracy <= 60) setGpsStatus('weak', 'GPS zayıf', '±' + Math.round(c.accuracy) + ' m');
+    else setGpsStatus('bad', 'Konum hassas değil', '±' + Math.round(c.accuracy) + ' m', 'Gerçek hız için Bluetooth GPS alıcısı gerekli');
+  }
+  function onPosErr(e){
+    if (e.code === 1) setGpsStatus('bad', 'Konum izni reddedildi', '', 'Ayarlar › Gizlilik › Konum Servisleri › Safari Web Siteleri');
+    else if (e.code === 3) setGpsStatus('weak', 'Konum bekleniyor…');
+    else setGpsStatus('bad', 'Konum alınamıyor', '', 'Bluetooth GPS alıcısını kontrol et');
+  }
+  setInterval(function(){
+    if (S.source === 'gps' && lastFixTs && Date.now() - lastFixTs > 6000){
+      target = 0;
+      if (watchId !== null) setGpsStatus('bad', 'Sinyal yok', '', 'Son konumdan bu yana 6 sn geçti');
+    }
+  }, 2000);
+
+  /* ================= Demo ================= */
+  var demoT = 0, demoTimer = null;
+  function startDemo(){
+    stopDemo();
+    setGpsStatus('weak', 'Demo modu', '', '');
+    demoTimer = setInterval(function(){
+      demoT += 0.5;
+      var v = 70 + 55 * Math.sin(demoT / 9) + 25 * Math.sin(demoT / 3.3) + (Math.random() * 4 - 2);
+      v = Math.max(0, v); target = v;
+      T.dist += (v / 3.6) * 0.5; T.moving += 0.5; if (v > T.max) T.max = v;
+      heading = (demoT * 4) % 360;
+    }, 500);
+  }
+  function stopDemo(){ if (demoTimer){ clearInterval(demoTimer); demoTimer = null; } }
+  function applySource(){
+    if (S.source === 'demo'){ startDemo(); }
+    else { stopDemo(); target = 0; lastFix = null; startGps(); }
+    $('srcLabel').textContent = S.source === 'demo' ? 'Kaynak: Demo' : 'Kaynak: GPS';
+  }
+
+  /* ================= Yolculuk paneli ================= */
+  function fmtNum(n, d){ return n.toFixed(d).replace('.', ','); }
+  var DIRS = ['K', 'KD', 'D', 'GD', 'G', 'GB', 'B', 'KB'];
+  function renderTrip(){
+    $('tDist').textContent = fmtNum(T.dist / 1000, T.dist < 100000 ? 1 : 0);
+    var m = Math.floor(T.moving / 60), h = Math.floor(m / 60);
+    $('tTime').textContent = h + ':' + ('0' + (m % 60)).slice(-2);
+    $('tAvg').textContent = T.moving > 30 ? Math.round((T.dist / T.moving) * 3.6) : 0;
+    $('tMax').textContent = Math.round(T.max);
+    $('chipMax').textContent = Math.round(T.max);
+    $('tOdo').textContent = Math.round(T.odo / 1000).toLocaleString('tr-TR');
+    $('chipHeading').textContent = heading === null ? '—' : DIRS[Math.round(heading / 45) % 8] + ' ' + Math.round(heading) + '°';
+  }
+  setInterval(renderTrip, 1000);
+  setInterval(function(){ save('ap_trip', T); }, 5000);
+  $('btnResetTrip').addEventListener('click', function(){ T.dist = 0; T.moving = 0; T.max = 0; save('ap_trip', T); renderTrip(); });
+
+  /* ================= Saat & gece modu ================= */
+  function tickClock(){
+    var d = new Date();
+    $('time').textContent = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    $('sec').textContent = ('0' + d.getSeconds()).slice(-2);
+    if (d.getSeconds() === 0 || !$('date').textContent){
+      $('date').textContent = d.toLocaleDateString('tr-TR', {day:'numeric', month:'long', weekday:'long'});
+      applyNight();
+    }
+  }
+  function applyNight(){
+    var on;
+    if (S.night === 'on') on = true;
+    else if (S.night === 'off') on = false;
+    else { var h = new Date().getHours(); on = (h >= 19 || h < 7); }
+    document.body.classList.toggle('night', on);
+    $('face1').setAttribute('stop-color', on ? '#0c1015' : '#1a222b');
+    $('face2').setAttribute('stop-color', on ? '#000000' : '#06080b');
+    $('btnNight').textContent = on ? 'Gündüz' : 'Gece';
+  }
+  $('btnNight').addEventListener('click', function(){
+    S.night = document.body.classList.contains('night') ? 'off' : 'on'; save('ap_settings', S); applyNight(); syncSettingsUI();
+  });
+  setInterval(tickClock, 1000);
+
+  /* ================= Hava durumu (Open-Meteo, anahtarsız) ================= */
+  var weatherFetchedWithGps = false;
+  var WMAP = [
+    [[0], '☀️', 'Açık'], [[1, 2], '🌤️', 'Az bulutlu'], [[3], '☁️', 'Kapalı'], [[45, 48], '🌫️', 'Sisli'],
+    [[51, 53, 55, 56, 57], '🌦️', 'Çisenti'], [[61, 63, 65, 66, 67], '🌧️', 'Yağmurlu'], [[71, 73, 75, 77], '❄️', 'Karlı'],
+    [[80, 81, 82], '🌧️', 'Sağanak'], [[85, 86], '🌨️', 'Kar sağanağı'], [[95, 96, 99], '⛈️', 'Fırtına']
+  ];
+  function wInfo(code){ for (var i = 0; i < WMAP.length; i++) if (WMAP[i][0].indexOf(code) > -1) return WMAP[i]; return [0, '🌡️', '']; }
+  function fetchWeather(){
+    var lat, lon;
+    if (lastLatLon && lastLatLon.acc < 5000){ lat = lastLatLon.lat; lon = lastLatLon.lon; }
+    else { var p = S.city.split(','); lat = +p[0]; lon = +p[1]; }
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat.toFixed(3) + '&longitude=' + lon.toFixed(3) + '&current=temperature_2m,weather_code&timezone=auto';
+    fetch(url).then(function(r){ return r.json(); }).then(function(j){
+      if (!j || !j.current) return;
+      var w = wInfo(j.current.weather_code);
+      $('wIcon').textContent = w[1];
+      $('wTemp').textContent = Math.round(j.current.temperature_2m) + '°';
+      $('wDesc').textContent = w[2];
+    }).catch(function(){ $('wDesc').textContent = 'Hava durumu yok'; });
+  }
+  setInterval(fetchWeather, 15 * 60 * 1000);
+
+  /* ================= Uygulama başlatıcı ================= */
+  var APPS = {
+    spotify: {scheme:'spotify://', web:'https://open.spotify.com/'},
+    youtube: {scheme:'youtube://', web:'https://m.youtube.com/'},
+    navi:    {scheme:'yandexnavi://', web:'https://yandex.com.tr/maps/'},
+    maps:    {scheme:'yandexmaps://', web:'https://yandex.com.tr/maps/'}
+  };
+  function openApp(key){
+    var a = APPS[key]; if (!a) return;
+    var left = false;
+    function onHide(){ if (document.hidden) left = true; }
+    document.addEventListener('visibilitychange', onHide);
+    window.location.href = a.scheme;
+    setTimeout(function(){
+      document.removeEventListener('visibilitychange', onHide);
+      if (!left && !document.hidden && S.webFallback === '1') window.open(a.web, '_blank');
+    }, 1600);
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.app-btn'), function(b){
+    b.addEventListener('click', function(){ openApp(b.getAttribute('data-app')); });
+  });
+
+  /* ================= Sesli uyarı ================= */
+  var actx = null, lastBeep = 0;
+  function unlockAudio(){
+    try{ var AC = window.AudioContext || window.webkitAudioContext; if (AC && !actx) actx = new AC(); if (actx && actx.state === 'suspended') actx.resume(); }catch(e){}
+  }
+  function beep(){
+    if (!actx) return;
+    try{
+      var o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'sine'; o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, actx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.35, actx.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.35);
+      o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.4);
+    }catch(e){}
+  }
+  setInterval(function(){
+    if (S.beep === '1' && overLimit && Date.now() - lastBeep > 10000){ lastBeep = Date.now(); beep(); }
+  }, 500);
+
+  /* ================= Ayarlar penceresi ================= */
+  (function buildSwatches(){
+    var html = '';
+    for (var k in THEMES) html += '<button data-theme="' + k + '" title="' + THEMES[k].name + '" style="background:' + rgb(THEMES[k].c) + '"></button>';
+    $('swatches').innerHTML = html;
+    $('swatches').addEventListener('click', function(e){
+      var b = e.target.closest('button'); if (!b) return;
+      S.theme = b.getAttribute('data-theme'); save('ap_settings', S);
+      applyTheme(); buildGauge(); syncSettingsUI(); sweepStart = performance.now();
+    });
+  })();
+  function syncSettingsUI(){
+    $('sMax').value = String(S.max);
+    $('sLimit').value = S.limit;
+    $('sCalib').value = S.calib;
+    $('sCity').value = S.city;
+    Array.prototype.forEach.call(document.querySelectorAll('.seg'), function(seg){
+      var key = seg.getAttribute('data-key');
+      Array.prototype.forEach.call(seg.children, function(btn){ btn.classList.toggle('on', btn.getAttribute('data-v') === String(S[key])); });
+    });
+    Array.prototype.forEach.call($('swatches').children, function(b){ b.classList.toggle('on', b.getAttribute('data-theme') === S.theme); });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.seg'), function(seg){
+    seg.addEventListener('click', function(e){
+      var btn = e.target.closest('button'); if (!btn) return;
+      var key = seg.getAttribute('data-key');
+      S[key] = btn.getAttribute('data-v'); save('ap_settings', S); syncSettingsUI();
+      if (key === 'night') applyNight();
+      if (key === 'source') applySource();
+      if (key === 'beep' && S.beep === '1'){ unlockAudio(); beep(); }
+    });
+  });
+  $('sMax').addEventListener('change', function(){ S.max = +this.value; save('ap_settings', S); buildGauge(); });
+  $('sLimit').addEventListener('change', function(){ S.limit = Math.max(0, Math.min(300, +this.value || 0)); save('ap_settings', S); updateLimitMark(); });
+  $('sCalib').addEventListener('change', function(){ S.calib = Math.max(80, Math.min(120, +this.value || 100)); this.value = S.calib; save('ap_settings', S); });
+  $('sCity').addEventListener('change', function(){ S.city = this.value; save('ap_settings', S); fetchWeather(); });
+  $('btnSettings').addEventListener('click', function(){ syncSettingsUI(); $('settingsOverlay').classList.remove('hidden'); });
+  $('btnCloseSettings').addEventListener('click', function(){ $('settingsOverlay').classList.add('hidden'); });
+  $('btnResetOdo').addEventListener('click', function(){ T.odo = 0; save('ap_trip', T); renderTrip(); });
+
+  /* ================= Başlat ================= */
+  $('btnStart').addEventListener('click', function(){
+    unlockAudio();
+    $('startOverlay').classList.add('hidden');
+    if (S.sweep === '1') sweepStart = performance.now();
+    applySource();
+  });
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden && S.source === 'gps' && $('startOverlay').classList.contains('hidden')){ stopGps(); lastFix = null; startGps(); unlockAudio(); }
+  });
+
+  applyTheme(); sizeDial(); buildGauge(); applyNight(); tickClock(); renderTrip(); fetchWeather(); syncSettingsUI();
+  $('srcLabel').textContent = S.source === 'demo' ? 'Kaynak: Demo' : 'Kaynak: GPS';
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
